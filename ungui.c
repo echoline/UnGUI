@@ -54,6 +54,7 @@ static void connectobj(GtkWidget *button, gpointer window) {
 			}
 			if (selected->next != NULL) {
 				selected->next->prev = NULL;
+				selected->next = NULL;
 			}
 		}
 		selected = NULL;
@@ -244,11 +245,13 @@ static void execute(GtkWidget *button, gpointer __unused) {
 			if (data->data == NULL) {
 				gint argc;
 				char **argv;
+
 				if (!g_shell_parse_argv(data->cmd, &argc, &argv, NULL))
 					return;
 
-				if (!g_spawn_async_with_pipes(NULL, argv, NULL, 0, NULL, NULL, NULL,
-								&data->stdin, &data->stdout, NULL, NULL))
+				if (!g_spawn_async_with_pipes(NULL, argv, NULL, 0, NULL, 
+							      NULL, NULL, &data->stdin,
+							      &data->stdout, NULL, NULL))
 					return;
 
 				if (last == NULL) {
@@ -272,18 +275,20 @@ static void execute(GtkWidget *button, gpointer __unused) {
 					if (last->data == NULL) {
 						len = 0;
 						char c;
-						while (read(last->stdout, &c, 1) > 0) {
+						while (read(last->stdout, &c, 1) == 1) {
 							len++;
 							contents = realloc(contents, len+1);
 							contents[len-1] = c;
 						}
-						contents[len] = 0;
-						buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
-						data->undohist = g_list_append(data->undohist, g_strdup(contents));
-						data->undoptr = g_list_last(data->undohist);
-						gtk_widget_set_sensitive(data->redo, FALSE);
-						gtk_widget_set_sensitive(data->undo, TRUE);
-						gtk_text_buffer_set_text(buffer, contents, -1);
+						if (contents != NULL) {
+							contents[len] = 0;
+							buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
+							data->undohist = g_list_append(data->undohist, g_strdup(contents));
+							data->undoptr = g_list_last(data->undohist);
+							gtk_widget_set_sensitive(data->redo, FALSE);
+							gtk_widget_set_sensitive(data->undo, TRUE);
+							gtk_text_buffer_set_text(buffer, contents, -1);
+						}
 					} else {
 						buffer = gtk_text_view_get_buffer((GtkTextView*)last->data);
 						len = gtk_text_buffer_get_char_count(buffer);
