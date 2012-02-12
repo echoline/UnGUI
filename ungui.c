@@ -25,33 +25,37 @@ struct _Object {
 	Object *next;
 	Object *prev;
 	GtkWidget *data;
+	GtkWidget *undo;
+	GtkWidget *redo;
 	char *cmd;
 	int stdin;
 	int stdout;
+	GList *undohist;
+	GList *undoptr;
 };
 Object *selected = NULL;
 GtkWidget *selbutton = NULL;
 GList *objects = NULL;
 
-static GtkWidget* new_data_window(GtkTextBuffer **);
+static GtkWidget* new_data_window(GtkTextBuffer **, Object **);
+static void closeprogram(GtkWidget *__unused, gpointer window);
 
 /* g_signal_connect callbacks */
 
 static void connectobj(GtkWidget *button, gpointer window) {
-	GList *iter = objects;
-	Object *data;
+	Object *data = window;
 
-	while (iter != NULL) {
-		data = iter->data;
-		if (window == data->window)
-			break;
-		iter = iter->next;
-	}
-
-	if (iter == NULL || iter->data == selected) {
+	if (data == selected) {
 		gtk_drag_unhighlight(button);
-		if (selected != NULL)
-			selected->prev = selected->next = NULL;
+		if (selected != NULL) {
+			if (selected->prev != NULL) {
+				selected->prev->next = NULL;
+				selected->prev = NULL;
+			}
+			if (selected->next != NULL) {
+				selected->next->prev = NULL;
+			}
+		}
 		selected = NULL;
 		selbutton = NULL;
 	} else if (selbutton != NULL) {
@@ -62,7 +66,7 @@ static void connectobj(GtkWidget *button, gpointer window) {
 		selbutton = NULL;
 	} else {
 		gtk_drag_highlight(button);
-		selected = iter->data;
+		selected = data;
 		selbutton = button;
 	}
 }
@@ -84,8 +88,10 @@ static void syspath(GtkWidget *button, gpointer window) {
 		const gchar *cmd = gtk_entry_get_text((GtkEntry*)text);
 		Object *data = calloc(1, sizeof(Object));
 		data->cmd = g_strdup(cmd);
+		
+		g_signal_connect(program, "destroy", (GCallback)closeprogram, data);
 		gtk_window_set_title(GTK_WINDOW(program), cmd);
-		gtk_widget_set_size_request(program, 320, -1);
+		gtk_widget_set_size_request(program, 100, 100);
 
 		GtkWidget *hbox = gtk_hbox_new (FALSE, 1);
 		GtkWidget *toolbar = gtk_toolbar_new();
@@ -94,7 +100,7 @@ static void syspath(GtkWidget *button, gpointer window) {
 		objects = g_list_append(objects, data);
 
 		GtkWidget *button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-connect");
-		g_signal_connect(button, "clicked", (GCallback)connectobj, program);
+		g_signal_connect(button, "clicked", (GCallback)connectobj, data);
 		gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
 
 		gtk_box_pack_start ((GtkBox*)hbox, toolbar, TRUE, TRUE, 0);
@@ -109,6 +115,7 @@ static void opendata(GtkWidget *button, gpointer __unused) {
 	GtkWidget *window;
 	GtkTextBuffer *buffer;
 	GtkTextIter start;
+	Object *data;
 	gchar *contents;
 	GtkWidget *dialog = gtk_file_chooser_dialog_new ("Open Data from File",
 				NULL,
@@ -121,10 +128,12 @@ static void opendata(GtkWidget *button, gpointer __unused) {
 		filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (dialog));
 
 		if (g_file_get_contents(filename, &contents, NULL, NULL)) {
-			window = new_data_window(&buffer);
+			window = new_data_window(&buffer, &data);
 			gtk_window_set_title(GTK_WINDOW(window), filename);
 			gtk_text_buffer_get_start_iter(buffer, &start);
 			gtk_text_buffer_insert(buffer, &start, contents, -1);
+			data->undohist = g_list_append(data->undohist, g_strdup(contents));
+			data->undoptr = g_list_last(data->undohist);
 		}
 
 		g_free (filename);
@@ -134,7 +143,8 @@ static void opendata(GtkWidget *button, gpointer __unused) {
 
 static void newdata(GtkWidget *button, gpointer __unused) {
 	GtkTextBuffer *buffer;
-	GtkWidget *window = new_data_window(&buffer);
+	Object *data;
+	GtkWidget *window = new_data_window(&buffer, &data);
 	gtk_window_set_title(GTK_WINDOW(window), "[new data]");
 }
 
@@ -144,17 +154,9 @@ static void savedata(GtkWidget *button, gpointer window) {
 	char *filename;
 	gchar *contents;
 	GtkTextIter start, end;
-	GList *iter = objects;
-	Object *data;
+	Object *data = window;
 
-	while (iter != NULL) {
-		data = iter->data;
-		if (window == data->window)
-			break;
-		iter = iter->next;
-	}
-
-	if (iter == NULL)
+	if (data == NULL)
 		return;
 
 	dialog = gtk_file_chooser_dialog_new ("Save Data to File",
@@ -170,33 +172,58 @@ static void savedata(GtkWidget *button, gpointer window) {
 		gtk_text_buffer_get_end_iter(buffer, &end);
 		contents = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
 		g_file_set_contents(filename, contents, -1, NULL);
+		data->undohist = g_list_append(data->undohist, g_strdup(contents));
+		data->undoptr = g_list_last(data->undohist);
+		gtk_widget_set_sensitive(data->redo, FALSE);
+		gtk_widget_set_sensitive(data->undo, TRUE);
 		gtk_window_set_title(GTK_WINDOW(data->window), filename);
 		g_free (filename);
 	}
 	gtk_widget_destroy (dialog);
 }
 
-static void closedata(GtkWidget *__unused, gpointer textview) {
-	GList *iter = objects;
-	Object *data;
+static void closedata(GtkWidget *__unused, gpointer obj) {
+	Object *data = obj;
 
-	while (iter != NULL) {
-		data = iter->data;
-		if (textview == data->data)
-			break;
-		iter = iter->next;
+	if (data == NULL)
+		return;
+
+	GList *iter2 = objects;
+	while (iter2 != NULL) {
+		if (((Object*)iter2->data)->next == data)
+			((Object*)iter2->data)->next = NULL;
+		if (((Object*)iter2->data)->prev == data)
+			((Object*)iter2->data)->prev = NULL;
+		iter2 = iter2->next;
 	}
 
-	if (iter != NULL) {
-		objects = g_list_remove(objects, data);
-		free(data);
+	objects = g_list_remove(objects, data);
+	free(data);
+}
+
+static void closeprogram(GtkWidget *__unused, gpointer window) {
+	Object *data = window;
+	GList *iter2 = objects;
+
+	if (data == NULL)
+		return;
+
+	while (iter2 != NULL) {
+		if (((Object*)iter2->data)->next == data)
+			((Object*)iter2->data)->next = NULL;
+		if (((Object*)iter2->data)->prev == data)
+			((Object*)iter2->data)->prev = NULL;
+		iter2 = iter2->next;
 	}
+
+	objects = g_list_remove(objects, data);
+	free(data);
 }
 
 static void execute(GtkWidget *button, gpointer __unused) {
 	GList *iter = objects;
 	GList *starts = NULL;
-	Object *data, *last = NULL;
+	Object *data, *last;
 	GtkTextBuffer *buffer;
 	GtkTextIter start, end;
 	char *contents = NULL;
@@ -212,6 +239,7 @@ static void execute(GtkWidget *button, gpointer __unused) {
 	while (starts != NULL) {
 		data = starts->data;
 		starts = g_list_remove(starts, data);
+		last = NULL;
 		while (data != NULL) {
 			if (data->data == NULL) {
 				gint argc;
@@ -251,6 +279,10 @@ static void execute(GtkWidget *button, gpointer __unused) {
 						}
 						contents[len] = 0;
 						buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
+						data->undohist = g_list_append(data->undohist, g_strdup(contents));
+						data->undoptr = g_list_last(data->undohist);
+						gtk_widget_set_sensitive(data->redo, FALSE);
+						gtk_widget_set_sensitive(data->undo, TRUE);
 						gtk_text_buffer_set_text(buffer, contents, -1);
 					} else {
 						buffer = gtk_text_view_get_buffer((GtkTextView*)last->data);
@@ -259,53 +291,117 @@ static void execute(GtkWidget *button, gpointer __unused) {
 						gtk_text_buffer_get_end_iter(buffer, &end);
 						contents = gtk_text_buffer_get_text(buffer, &start, &end, 0);
 						buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
+						data->undohist = g_list_append(data->undohist, g_strdup(contents));
+						data->undoptr = g_list_last(data->undohist);
+						gtk_widget_set_sensitive(data->redo, FALSE);
+						gtk_widget_set_sensitive(data->undo, TRUE);
 						gtk_text_buffer_set_text(buffer, contents, -1);
 					}
 				}
 			}
 			last = data;
 			data = data->next;
+			
 		}
 	}
 }
 
 /* end of g_signal_connect callbacks */
 
+static void undodata(GtkWidget *button, gpointer obj) {
+	Object *data = obj;
+	GtkTextBuffer *buffer;
 
-static GtkWidget* new_data_window(GtkTextBuffer **buffer) {
+	if (data->undoptr->prev != NULL) {
+		data->undoptr = data->undoptr->prev;
+		buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
+		gtk_text_buffer_set_text(buffer, data->undoptr->data, -1);
+	}
+	if (data->undoptr->prev != NULL)
+		gtk_widget_set_sensitive(data->undo, TRUE);
+	else
+		gtk_widget_set_sensitive(data->undo, FALSE);
+	if (data->undoptr->next != NULL)
+		gtk_widget_set_sensitive(data->redo, TRUE);
+	else
+		gtk_widget_set_sensitive(data->redo, FALSE);
+}
+
+static void redodata(GtkWidget *button, gpointer obj) {
+	Object *data = obj;
+	GtkTextBuffer *buffer;
+
+	if (data->undoptr->next != NULL) {
+		data->undoptr = data->undoptr->next;
+		buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
+		gtk_text_buffer_set_text(buffer, data->undoptr->data, -1);
+	}
+	if (data->undoptr->prev != NULL)
+		gtk_widget_set_sensitive(data->undo, TRUE);
+	else
+		gtk_widget_set_sensitive(data->undo, FALSE);
+	if (data->undoptr->next != NULL)
+		gtk_widget_set_sensitive(data->redo, TRUE);
+	else
+		gtk_widget_set_sensitive(data->redo, FALSE);
+}
+
+static GtkWidget* new_data_window(GtkTextBuffer **textbuffer, Object **object) {
 	GtkWidget *window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	GtkWidget *vbox = gtk_vbox_new (FALSE, 2);
 	GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
 	GtkWidget *textview = gtk_text_view_new();
 	GtkWidget *toolbar;
 	GtkWidget *button;
+	GtkTextBuffer *buffer;
+	GtkStyle *style;
 
 	Object *data = calloc(1, sizeof(Object));
 	data->data = textview;
 	data->window = window;
 
-	g_signal_connect(window, "destroy", (GCallback)closedata, textview);
-	gtk_widget_set_size_request(window, 480, 320);
+	g_signal_connect(window, "destroy", (GCallback)closedata, data);
+	gtk_widget_set_size_request(window, 320, 120);
 	gtk_container_border_width (GTK_CONTAINER (vbox), 1);
 	gtk_container_add (GTK_CONTAINER (window), vbox);
 
 	toolbar = gtk_toolbar_new();
 
 	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-connect");
-	g_signal_connect(button, "clicked", (GCallback)connectobj, window);
+	g_signal_connect(button, "clicked", (GCallback)connectobj, data);
 	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
 
 	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-save");
-	g_signal_connect(button, "clicked", (GCallback)savedata, window);
+	g_signal_connect(button, "clicked", (GCallback)savedata, data);
 	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
 
+	data->undo = button =
+		(GtkWidget*)gtk_tool_button_new_from_stock("gtk-undo");
+	g_signal_connect(button, "clicked", (GCallback)undodata, data);
+	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
+
+	data->redo = button = 
+		(GtkWidget*)gtk_tool_button_new_from_stock("gtk-redo");
+	g_signal_connect(button, "clicked", (GCallback)redodata, data);
+	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
+
+	gtk_widget_set_sensitive(data->redo, FALSE);
+	gtk_widget_set_sensitive(data->undo, FALSE);
 	objects = g_list_append(objects, data);
 
 	gtk_box_pack_start (GTK_BOX (vbox), toolbar, FALSE, TRUE, 0);
 	gtk_box_pack_start (GTK_BOX (vbox), scrolled, TRUE, TRUE, 1);
 
+	style = gtk_widget_get_style(textview);
+	pango_font_description_set_family(style->font_desc, "fixed");
+	gtk_widget_modify_font(textview, style->font_desc);
+
 	gtk_container_add (GTK_CONTAINER (scrolled), textview);
-	*buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
+	buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
+	if (textbuffer != NULL)
+		*textbuffer = buffer;
+	if (object != NULL)
+		*object = data;
 
 	gtk_widget_show_all (window);
 	return window;
@@ -326,7 +422,7 @@ int main(int argc, char *argv[])
 	gtk_widget_set_size_request(window, 320, -1);
 	gtk_window_set_default_icon_name("gtk-execute");
 
-	hbox = gtk_hbox_new (FALSE, 1);
+	hbox = gtk_hbox_new (FALSE, 3);
 	gtk_container_border_width (GTK_CONTAINER (hbox), 3);
 	gtk_container_add (GTK_CONTAINER (window), hbox);
 
@@ -343,14 +439,16 @@ int main(int argc, char *argv[])
 	gtk_box_pack_start (GTK_BOX (hbox), toolbar, TRUE, TRUE, 0);
 	toolbar = gtk_toolbar_new();
 
-	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-add");
+	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-convert");
+	gtk_tool_button_set_label((GtkToolButton*)button, "Programs"); 
 	g_signal_connect(button, "clicked", (GCallback)syspath, NULL);
 	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
 
 	gtk_box_pack_start (GTK_BOX (hbox), toolbar, TRUE, TRUE, 1);
 	toolbar = gtk_toolbar_new();
 
-	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-apply");
+	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-go-forward");
+	gtk_tool_button_set_label((GtkToolButton*)button, "Run"); 
 	g_signal_connect(button, "clicked", (GCallback)execute, NULL);
 	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
 
