@@ -11,6 +11,49 @@ of the concepts behind a command-line interface, such as found on
 a POSIX-compatible Operating System.  When combined with an X11
 window manager, it can be the basis for a desktop environment.
 
+.SH USE
+UnGUI has a two types of windows in addition to the main toolbar.
+The main toolbar allows users to add
+.B Program
+and
+.B Data
+windows.  Program windows specify programs which can be run as
+explained below.  Data windows allow the user to edit, display,
+and save text.
+
+Data windows and Program windows can be linked together 
+(formally `piped' in Unix) by pressing the
+.B Connect
+buttons on each in an ordered sequence.  This can be repeated
+to link three or more items.  Linking has the effect of sending
+data to or from a window of any type.  Program windows run the
+specified program on the data sent when the
+.B Run
+button is clicked.  When this happens, Data windows display
+incoming data and, if there is a link onwards, send it on.
+
+.SH STORY
+As computers moved into the home, user interface design
+adapted, catering first to the management, and then to
+those who wished the computer were a secretary.
+
+Computers finally became a household appliance which no
+one really understands; intentionally obfuscated.  People
+who wish to understand are left pining for the computers
+of the 1960's; long before recollection, or even birth.
+
+What are the options?  A command line often comes in
+handy; though the learning curve is steep.  Or succumb
+to a household appliance which externalizes its possible
+functionalities; always imposing upon you what you can
+and cannot do.
+
+This program is UnGUI, a graphical frontend to a Unix
+environment which allows programs' inputs and outputs to
+be piped together and used in ways similar to the shell,
+except with a higher emphasis on graphical interface
+concepts in the design of the software.
+
 .SH HELPING OUT
 If you find a bug, please feel free to try fixing it yourself.
 Your publicly announced changes may be incorporated upstream, with

@@ -1,25 +1,66 @@
-UnGUI: A GTK Non-Traditional Shell
+UNGUI(1)                                                              UNGUI(1)
 
-As computers moved into the home, user interface design
-adapted, catering first to the management, and then to
-those who wished the computer were a secretary.
 
-Computers finally became a household appliance which no
-one really understands; intentionally obfuscated.  People
-who wish to understand are left pining for the computers
-of the 1960's; long before recollection, or even birth.
 
-What are the options?  A command line often comes in
-handy; though the learning curve is steep.  Or succumb
-to a household appliance which externalizes its possible
-functionalities; always imposing upon you what you can
-and cannot do.
+NAME
+       UnGUI - Unix Concepts GUI
 
-This program is UnGUI, a graphical frontend to a Unix
-environment which allows programs' inputs and outputs to
-be piped together and used in ways similar to the shell,
-except with a higher emphasis on graphical interface
-concepts in the design of the software.
 
-The sourcecode aims to be simple, consistent, easy to
-audit, and free of bugs.  Please fix any found.
+SYNOPSIS
+       ungui
+
+DESCRIPTION
+       UnGUI is a graphical user interface which attempts to make visual a few
+       of the concepts behind a command-line interface, such  as  found  on  a
+       POSIX-compatible  Operating  System.   When combined with an X11 window
+       manager, it can be the basis for a desktop environment.
+
+
+USE
+       UnGUI has a two types of windows in addition to the main toolbar.   The
+       main  toolbar  allows  users  to add Program and Data windows.  Program
+       windows specify programs which can be run  as  explained  below.   Data
+       windows allow the user to edit, display, and save text.
+
+       Data  windows  and  Program  windows  can  be linked together (formally
+       `piped' in Unix) by pressing the Connect buttons on each in an  ordered
+       sequence.   This  can be repeated to link three or more items.  Linking
+       has the effect of sending data to or from a window of any  type.   Pro-
+       gram  windows  run  the specified program on the data sent when the Run
+       button is clicked.  When this happens, Data  windows  display  incoming
+       data and, if there is a link onwards, send it on.
+
+
+STORY
+       As computers moved into the home, user interface design adapted, cater-
+       ing first to the management, and then to those who wished the  computer
+       were a secretary.
+
+       Computers  finally  became  a  household  appliance which no one really
+       understands; intentionally obfuscated.  People who wish  to  understand
+       are  left pining for the computers of the 1960's; long before recollec-
+       tion, or even birth.
+
+       What are the options?  A command line often comes in handy; though  the
+       learning  curve  is  steep.   Or succumb to a household appliance which
+       externalizes its possible functionalities;  always  imposing  upon  you
+       what you can and cannot do.
+
+       This program is UnGUI, a graphical frontend to a Unix environment which
+       allows programs' inputs and outputs to be piped together  and  used  in
+       ways  similar  to the shell, except with a higher emphasis on graphical
+       interface concepts in the design of the software.
+
+
+HELPING OUT
+       If you find a bug, please feel free to try fixing  it  yourself.   Your
+       publicly  announced  changes  may  be  incorporated  upstream, with due
+       credit.
+
+
+AUTHORS
+       Eli Cohen
+
+
+
+                                  13 Feb 2012                         UNGUI(1)
