@@ -394,6 +394,7 @@ static GtkWidget* new_data_window(GtkTextBuffer **textbuffer, Object **object) {
 
 	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-save");
 	g_signal_connect(button, "clicked", (GCallback)savedata, data);
+	gtk_tool_button_set_label((GtkToolButton*)button, "Write");
 	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
 
 	data->undo = button =
@@ -449,18 +450,19 @@ int main(int argc, char *argv[])
 
 	toolbar = gtk_toolbar_new();
 
+	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-execute");
+	gtk_tool_button_set_label((GtkToolButton*)button, "Programs"); 
+	g_signal_connect(button, "clicked", (GCallback)syspath, NULL);
+	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
+
 	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-new");
 	g_signal_connect(button, "clicked", (GCallback)newdata, NULL);
-	gtk_tool_button_set_label((GtkToolButton*)button, "New Data");
+	gtk_tool_button_set_label((GtkToolButton*)button, "Data");
 	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
 
 	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-open");
 	g_signal_connect(button, "clicked", (GCallback)opendata, NULL);
-	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
-
-	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-execute");
-	gtk_tool_button_set_label((GtkToolButton*)button, "Programs"); 
-	g_signal_connect(button, "clicked", (GCallback)syspath, NULL);
+	gtk_tool_button_set_label((GtkToolButton*)button, "Read");
 	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
 
 	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-go-forward");
