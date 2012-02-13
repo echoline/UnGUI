@@ -16,6 +16,8 @@
  */
 #include <gtk/gtk.h>
 #include <stdlib.h>
+#include <string.h>
+#define MAXESCSEQLEN 16 
 
 /* type representation of program and data items */
 
@@ -174,7 +176,7 @@ static void savedata(GtkWidget *button, gpointer window) {
 		buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
 		gtk_text_buffer_get_start_iter(buffer, &start);
 		gtk_text_buffer_get_end_iter(buffer, &end);
-		contents = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
+		contents = gtk_text_buffer_get_text(buffer, &start, &end, TRUE);
 		g_file_set_contents(filename, contents, -1, NULL);
 		data->undohist = g_list_append(data->undohist, g_strdup(contents));
 		data->undoptr = g_list_last(data->undohist);
@@ -205,13 +207,65 @@ static void closeitem(GtkWidget *__unused, gpointer obj) {
 	free(data);
 }
 
+static void termbuffer(gchar *contents, GtkTextBuffer **buffer) {
+	gchar **sections = g_strsplit(contents, (char[]){ 0x1B, 0 }, -1);
+	gint i = 0, j;
+	GtkTextIter start, end;
+	GtkTextTag *tag;
+	gchar *content = NULL, *ptr;
+
+	gtk_text_buffer_get_start_iter(*buffer, &start);
+	gtk_text_buffer_get_end_iter(*buffer, &end);
+	gtk_text_buffer_delete(*buffer, &start, &end);
+	gtk_text_buffer_get_start_iter(*buffer, &end); // meh.
+
+	while (sections[i] != NULL) {
+		tag = gtk_text_buffer_create_tag(*buffer, NULL, NULL);
+		if (sections[i][0] != '[') {
+			if (i != 0)
+				content = g_strconcat((char[]){ 0x1B, 0 }, sections[i], NULL);
+			else
+				content = g_strconcat(sections[i], NULL);
+			
+		} else {
+			ptr = &sections[i][1];
+
+			if (strchr(ptr, 'm') != NULL) {
+				ptr[strcspn(ptr, "m")] = '\0';
+				j = strlen(ptr)+1;
+				ptr[strcspn(ptr, ";")] = '\0';
+
+				switch(atoi(ptr)) {
+				case 0:
+					g_object_set(tag, "weight", PANGO_WEIGHT_NORMAL, NULL);
+					break; 
+				case 1:
+					g_object_set(tag, "weight", PANGO_WEIGHT_BOLD, NULL);
+					break;
+				}
+
+				content = g_strconcat(&ptr[j], NULL);
+			} else {
+				content = g_strconcat(ptr, NULL);
+			}
+		}
+
+		gtk_text_buffer_insert_with_tags(*buffer, &end, content, -1, tag, NULL);
+		gtk_text_buffer_get_end_iter(*buffer, &end);
+		g_free(content);
+		i++;
+	}
+
+	g_strfreev(sections);
+}
+
 static void execute(GtkWidget *button, gpointer __unused) {
 	GList *iter = objects;
 	GList *starts = NULL;
 	Object *data, *last;
 	GtkTextBuffer *buffer;
 	GtkTextIter start, end;
-	char *contents = NULL;
+	gchar *contents = NULL;
 	gint len;
 	GError *error = NULL;
 	GtkWidget *dialog;
@@ -261,7 +315,7 @@ static void execute(GtkWidget *button, gpointer __unused) {
 					len = gtk_text_buffer_get_char_count(buffer);
 					gtk_text_buffer_get_start_iter(buffer, &start);
 					gtk_text_buffer_get_end_iter(buffer, &end);
-					contents = gtk_text_buffer_get_text(buffer, &start, &end, 0);
+					contents = gtk_text_buffer_get_text(buffer, &start, &end, TRUE);
 					write(data->stdin, contents, len);
 					close(data->stdin);
 				}
@@ -291,9 +345,12 @@ static void execute(GtkWidget *button, gpointer __unused) {
 							gtk_text_buffer_get_start_iter(buffer, &start);
 							gtk_text_buffer_get_end_iter(buffer, &end);
 							data->undohist = g_list_append(data->undohist, g_strdup(
-									gtk_text_buffer_get_text(buffer, &start, &end, 0)));
-							gtk_text_buffer_set_text(buffer, contents, -1);
-							data->undohist = g_list_append(data->undohist, g_strdup(contents));
+									gtk_text_buffer_get_text(buffer, &start, &end, TRUE)));
+							termbuffer(contents, &buffer);
+							gtk_text_buffer_get_start_iter(buffer, &start);
+							gtk_text_buffer_get_end_iter(buffer, &end);
+							data->undohist = g_list_append(data->undohist, g_strdup(
+									gtk_text_buffer_get_text(buffer, &start, &end, TRUE)));
 							data->undoptr = g_list_last(data->undohist);
 						}
 					// data from an input window
@@ -301,7 +358,7 @@ static void execute(GtkWidget *button, gpointer __unused) {
 						buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
 						gtk_text_buffer_get_start_iter(buffer, &start);
 						gtk_text_buffer_get_end_iter(buffer, &end);
-						contents = gtk_text_buffer_get_text(buffer, &start, &end, 0);
+						contents = gtk_text_buffer_get_text(buffer, &start, &end, TRUE);
 						if (data->undohist == NULL)
 							gtk_widget_set_sensitive(data->undo, FALSE);
 						else
@@ -312,11 +369,12 @@ static void execute(GtkWidget *button, gpointer __unused) {
 						buffer = gtk_text_view_get_buffer((GtkTextView*)last->data);
 						gtk_text_buffer_get_start_iter(buffer, &start);
 						gtk_text_buffer_get_end_iter(buffer, &end);
-						contents = gtk_text_buffer_get_text(buffer, &start, &end, 0);
+						contents = gtk_text_buffer_get_text(buffer, &start, &end, TRUE);
 						len = gtk_text_buffer_get_char_count(buffer);
 						buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
-						gtk_text_buffer_set_text(buffer, contents, -1);
-						data->undohist = g_list_append(data->undohist, g_strdup(contents));
+						termbuffer(contents, &buffer);
+						data->undohist = g_list_append(data->undohist, g_strdup(
+									gtk_text_buffer_get_text(buffer, &start, &end, TRUE)));
 						data->undoptr = g_list_last(data->undohist);
 					}
 				}
