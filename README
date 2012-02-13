@@ -1,1 +1,24 @@
-an attempt at a GUI (in GTK) which naturally reflects the shell
+UnGUI: A GTK Non-Traditional Shell
+
+Long ago, Unix was the most prevalent Operating System.
+As computers moved into the home, user interface design
+adapted, catering to a lower and lower common denominator.
+Computers finally became a household appliance which no
+one really understands; no one can.  People who wish for
+understanding are left pining for the computers of the
+1960's; long before recollection, or even birth.
+
+What are the options?  A command line often comes in
+handy; though the learning curve is steep.  Or succumb
+to a household appliance which externalizes its possible
+functionalities; always imposing upon you what you can
+and cannot do.
+
+This program is UnGUI, a graphical frontend to a Unix
+enviroment which allows programs' input and outputs to
+be piped together and used in ways similar to the shell,
+except with a higher emphasis on graphical interface
+concepts in the design of the software.
+
+The sourcecode aims to be simple, consistent, easy to
+audit, and free of bugs.  Please fix them if found...
