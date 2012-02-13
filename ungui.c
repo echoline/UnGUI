@@ -138,7 +138,7 @@ static void opendata(GtkWidget *button, gpointer __unused) {
 			gtk_window_set_title(GTK_WINDOW(window), filename);
 			gtk_text_buffer_get_start_iter(buffer, &start);
 			gtk_text_buffer_insert(buffer, &start, contents, -1);
-			data->undohist = g_list_append(data->undohist, g_strdup(contents));
+			data->undohist = g_list_append(data->undohist, buffer);
 			data->undoptr = g_list_last(data->undohist);
 		}
 
@@ -178,7 +178,7 @@ static void savedata(GtkWidget *button, gpointer window) {
 		gtk_text_buffer_get_end_iter(buffer, &end);
 		contents = gtk_text_buffer_get_text(buffer, &start, &end, TRUE);
 		g_file_set_contents(filename, contents, -1, NULL);
-		data->undohist = g_list_append(data->undohist, g_strdup(contents));
+		data->undohist = g_list_append(data->undohist, buffer);
 		data->undoptr = g_list_last(data->undohist);
 		gtk_widget_set_sensitive(data->redo, FALSE);
 		gtk_widget_set_sensitive(data->undo, TRUE);
@@ -214,6 +214,7 @@ static void termbuffer(gchar *contents, GtkTextBuffer **buffer) {
 	GtkTextTag *tag;
 	gchar *content = NULL, *ptr;
 
+	*buffer = gtk_text_buffer_new(NULL);
 	gtk_text_buffer_get_start_iter(*buffer, &start);
 	gtk_text_buffer_get_end_iter(*buffer, &end);
 	gtk_text_buffer_delete(*buffer, &start, &end);
@@ -344,13 +345,12 @@ static void execute(GtkWidget *button, gpointer __unused) {
 							buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
 							gtk_text_buffer_get_start_iter(buffer, &start);
 							gtk_text_buffer_get_end_iter(buffer, &end);
-							data->undohist = g_list_append(data->undohist, g_strdup(
-									gtk_text_buffer_get_text(buffer, &start, &end, TRUE)));
+							data->undohist = g_list_append(data->undohist, buffer);
 							termbuffer(contents, &buffer);
+							gtk_text_view_set_buffer((GtkTextView*)data->data, buffer);
 							gtk_text_buffer_get_start_iter(buffer, &start);
 							gtk_text_buffer_get_end_iter(buffer, &end);
-							data->undohist = g_list_append(data->undohist, g_strdup(
-									gtk_text_buffer_get_text(buffer, &start, &end, TRUE)));
+							data->undohist = g_list_append(data->undohist, buffer);
 							data->undoptr = g_list_last(data->undohist);
 						}
 					// data from an input window
@@ -364,17 +364,17 @@ static void execute(GtkWidget *button, gpointer __unused) {
 						else
 							gtk_widget_set_sensitive(data->undo, TRUE);
 						gtk_widget_set_sensitive(data->redo, FALSE);
-						data->undohist = g_list_append(data->undohist, g_strdup(contents));
+						data->undohist = g_list_append(data->undohist, buffer);
 
 						buffer = gtk_text_view_get_buffer((GtkTextView*)last->data);
 						gtk_text_buffer_get_start_iter(buffer, &start);
 						gtk_text_buffer_get_end_iter(buffer, &end);
 						contents = gtk_text_buffer_get_text(buffer, &start, &end, TRUE);
 						len = gtk_text_buffer_get_char_count(buffer);
-						buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
+
 						termbuffer(contents, &buffer);
-						data->undohist = g_list_append(data->undohist, g_strdup(
-									gtk_text_buffer_get_text(buffer, &start, &end, TRUE)));
+						gtk_text_view_set_buffer((GtkTextView*)data->data, buffer);
+						data->undohist = g_list_append(data->undohist, buffer);
 						data->undoptr = g_list_last(data->undohist);
 					}
 				}
@@ -389,12 +389,11 @@ static void execute(GtkWidget *button, gpointer __unused) {
 
 static void undodata(GtkWidget *button, gpointer obj) {
 	Object *data = obj;
-	GtkTextBuffer *buffer;
 
 	if (data->undoptr->prev != NULL) {
 		data->undoptr = data->undoptr->prev;
-		buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
-		gtk_text_buffer_set_text(buffer, data->undoptr->data, -1);
+		if (GTK_IS_TEXT_BUFFER(data->undoptr->data)) // eh??
+			gtk_text_view_set_buffer((GtkTextView*)data->data, (GtkTextBuffer*)data->undoptr->data);
 	}
 	if (data->undoptr->prev != NULL)
 		gtk_widget_set_sensitive(data->undo, TRUE);
@@ -408,12 +407,10 @@ static void undodata(GtkWidget *button, gpointer obj) {
 
 static void redodata(GtkWidget *button, gpointer obj) {
 	Object *data = obj;
-	GtkTextBuffer *buffer;
 
 	if (data->undoptr->next != NULL) {
 		data->undoptr = data->undoptr->next;
-		buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
-		gtk_text_buffer_set_text(buffer, data->undoptr->data, -1);
+		gtk_text_view_set_buffer((GtkTextView*)data->data, (GtkTextBuffer*)data->undoptr->data);
 	}
 	if (data->undoptr->prev != NULL)
 		gtk_widget_set_sensitive(data->undo, TRUE);
