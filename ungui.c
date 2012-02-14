@@ -74,17 +74,25 @@ static void connectobj(GtkWidget *button, gpointer window) {
 	}
 }
 
+static gboolean syspathmatch(GtkEntryCompletion *complete, const gchar *key, GtkTreeIter *iter, gpointer opts) {
+	
+}
+
 static void syspath(GtkWidget *button, gpointer window) {
 	GtkWidget *dialog = gtk_dialog_new_with_buttons("Select Utility", NULL, 0, NULL);
 	GtkWidget *vbox = gtk_vbox_new(FALSE, 2);
-	GtkWidget *text = gtk_entry_new();
+	GtkEntry *text = (GtkEntry*)gtk_entry_new();
+	GtkEntryCompletion *complete = gtk_entry_get_completion(text);
+	gchar **path = g_strsplit(g_getenv("PATH"), ":", -1);
 
-	gtk_box_pack_start ((GtkBox*)vbox, text, TRUE, TRUE, 1);
+	gtk_entry_completion_set_match_func(complete, (GtkEntryCompletionMatchFunc)syspathmatch, NULL, NULL);
+
+	gtk_box_pack_start ((GtkBox*)vbox, (GtkWidget*)text, TRUE, TRUE, 1);
 	gtk_container_add((GtkContainer*)gtk_dialog_get_content_area((GtkDialog*)dialog), vbox);
 
 	gtk_dialog_add_button((GtkDialog*)dialog, "gtk-cancel", GTK_RESPONSE_CANCEL);
 	gtk_dialog_add_button((GtkDialog*)dialog, "gtk-open", GTK_RESPONSE_ACCEPT);
-	gtk_entry_set_activates_default((GtkEntry*)text, TRUE);
+	gtk_entry_set_activates_default(text, TRUE);
 	gtk_dialog_set_default_response((GtkDialog*)dialog, GTK_RESPONSE_ACCEPT);
 
 	gtk_widget_show_all(dialog);
@@ -212,7 +220,7 @@ static void termbuffer(gchar *contents, GtkTextBuffer **buffer) {
 	gint i = 0, j;
 	GtkTextIter start, end;
 	GtkTextTag *tag;
-	gchar *content = NULL, *ptr;
+	gchar *content = NULL, *ptr, *tok;
 
 	*buffer = gtk_text_buffer_new(NULL);
 	gtk_text_buffer_get_start_iter(*buffer, &start);
@@ -234,16 +242,65 @@ static void termbuffer(gchar *contents, GtkTextBuffer **buffer) {
 			if (strchr(ptr, 'm') != NULL) {
 				ptr[strcspn(ptr, "m")] = '\0';
 				j = strlen(ptr)+1;
-				ptr[strcspn(ptr, ";")] = '\0';
-
-				switch(atoi(ptr)) {
-				case 0:
-					g_object_set(tag, "weight", PANGO_WEIGHT_NORMAL, NULL);
-					break; 
-				case 1:
-					g_object_set(tag, "weight", PANGO_WEIGHT_BOLD, NULL);
-					break;
-				}
+				tok = strtok(ptr, ";");
+				if (tok != NULL) do {
+					switch(atoi(tok)) {
+					case 0:
+						g_object_set(tag, "weight", PANGO_WEIGHT_NORMAL, NULL);
+						break;
+					case 1:
+						g_object_set(tag, "weight", PANGO_WEIGHT_BOLD, NULL);
+						break;
+					case 30:
+						g_object_set(tag, "foreground", "black", NULL);
+						break;
+					case 31:
+						g_object_set(tag, "foreground", "red", NULL);
+						break;
+					case 32:
+						g_object_set(tag, "foreground", "darkgreen", NULL);
+						break;
+					case 33:
+						g_object_set(tag, "foreground", "orange", NULL);
+						break;
+					case 34:
+						g_object_set(tag, "foreground", "blue", NULL);
+						break;
+					case 35:
+						g_object_set(tag, "foreground", "purple", NULL);
+						break;
+					case 36:
+						g_object_set(tag, "foreground", "cyan", NULL);
+						break;
+					case 37:
+						g_object_set(tag, "foreground", "white", NULL);
+						break;
+					case 40:
+						g_object_set(tag, "background", "black", NULL);
+						break;
+					case 41:
+						g_object_set(tag, "background", "red", NULL);
+						break;
+					case 42:
+						g_object_set(tag, "background", "green", NULL);
+						break;
+					case 43:
+						g_object_set(tag, "background", "yellow", NULL);
+						break;
+					case 44:
+						g_object_set(tag, "background", "blue", NULL);
+						break;
+					case 45:
+						g_object_set(tag, "background", "purple", NULL);
+						break;
+					case 46:
+						g_object_set(tag, "background", "cyan", NULL);
+						break;
+					case 47:
+						g_object_set(tag, "background", "white", NULL);
+						break;
+					}
+				} while(tok = strtok(NULL, ";"));
 
 				content = g_strconcat(&ptr[j], NULL);
 			} else {
@@ -304,13 +361,17 @@ static void execute(GtkWidget *button, gpointer __unused) {
 					break;
 				}
 
+				// no previous item
 				if (last == NULL) {
 					close(data->stdin);
+				// from another program
 				} else if (last->data == NULL) {
 					char c;
 					while (read(last->stdout, &c, 1) > 0)
 						write(data->stdin, &c, 1);
+					close(last->stdout);
 					close(data->stdin);
+				// from a data window
 				} else {
 					buffer = gtk_text_view_get_buffer((GtkTextView*)last->data);
 					len = gtk_text_buffer_get_char_count(buffer);
@@ -333,6 +394,7 @@ static void execute(GtkWidget *button, gpointer __unused) {
 							contents = realloc(contents, len+1);
 							contents[len-1] = c;
 						}
+						close(last->stdout);
 						if (contents != NULL) {
 							contents[len] = 0;
 
