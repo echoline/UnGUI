@@ -60,10 +60,7 @@ static void connectobj(GtkWidget *button, gpointer window) {
 				selected->prev = NULL;
 			}
 
-			while (selected->nexts != NULL) {
-				selected->nexts->prev = NULL;
-				selected->nexts = g_list_remove(selected->nexts, selected);
-			}
+			selected->nexts = g_list_remove(selected->nexts, selected);
 
 			if (selected->cmd != NULL)
 				free(selected->cmd);
@@ -92,7 +89,7 @@ static gboolean syspathmatch(GtkEntryCompletion *complete, const gchar *key, Gtk
 }
 
 static void syspath(GtkWidget *button, gpointer window) {
-	GtkWidget *dialog = gtk_dialog_new_with_buttons("Select Utility", NULL, 0, NULL);
+	GtkWidget *dialog = gtk_dialog_new_with_buttons("Select Utility", NULL, 0, NULL, NULL);
 	GtkWidget *vbox = gtk_vbox_new(FALSE, 2);
 	GtkEntry *text = (GtkEntry*)gtk_entry_new();
 	GtkEntryCompletion *complete = gtk_entry_get_completion(text);
@@ -330,6 +327,8 @@ static void termbuffer(gchar *contents, GtkTextBuffer **buffer) {
 	g_strfreev(sections);
 }
 
+// previous object exists
+
 static void execute_r(Object *data) {
 	GtkTextBuffer *buffer;
 	GtkTextIter start, end;
@@ -342,15 +341,14 @@ static void execute_r(Object *data) {
 	char **argv;
 	GList *iter = data->nexts;
 
-	// destination is a program
+	// this Object is a program
 	if (data->data == NULL) {
 		if (!g_shell_parse_argv(data->cmd, &argc, &argv, NULL))
 			return;
 
 		if (!g_spawn_async_with_pipes(NULL, argv, NULL, 0, NULL,
 					      NULL, NULL, &data->stdin,
-					      &data->stdout, NULL,
-					      &error))
+					      &data->stdout, NULL, &error))
 		{
 			dialog = gtk_message_dialog_new(NULL, 0,
 					GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
@@ -360,18 +358,7 @@ static void execute_r(Object *data) {
 			return;
 		}
 
-		if (data->output == NULL) {
-			data->outlen = 0;
-			while (read(data->stdout, &c, 1) == 1) {
-				data->outlen++;
-				data->output = realloc(data->output, data->outlen+1);
-				data->output[data->outlen-1] = c;
-				data->output[data->outlen] = '\0';
-			}
-			close(data->stdout);
-		}
-
-		// previous object exists
+		// has a previous Object
 		if (data->prev != NULL) {
 			// and is a program
 			if (data->prev->output != NULL) {
@@ -387,7 +374,21 @@ static void execute_r(Object *data) {
 				write(data->stdin, contents, len);
 				close(data->stdin);
 			}
+		} else {
+			close(data->stdin);
 		}
+
+		if (data->output != NULL)
+			free(data->output);
+
+		data->outlen = 0;
+		while (read(data->stdout, &c, 1) == 1) {
+			data->outlen++;
+			data->output = realloc(data->output, data->outlen+1);
+			data->output[data->outlen-1] = c;
+			data->output[data->outlen] = '\0';
+		}
+		close(data->stdout);
 	// data destination is an input window
 	} else if (data->prev != NULL) {
 		// from a program
@@ -442,11 +443,6 @@ static void execute_r(Object *data) {
 	if (data->output != NULL) {
 		free(data->output);
 		data->output = NULL;
-	}
-
-	if (data->data == NULL) {
-		close(data->stdin);
-		close(data->stdout);
 	}
 }
 
@@ -516,7 +512,7 @@ static GtkWidget* new_data_window(GtkTextBuffer **textbuffer, Object **object) {
 
 	g_signal_connect(window, "destroy", (GCallback)closeitem, data);
 	gtk_widget_set_size_request(window, 320, 180);
-	gtk_container_border_width (GTK_CONTAINER (vbox), 1);
+	gtk_container_set_border_width (GTK_CONTAINER (vbox), 1);
 	gtk_container_add (GTK_CONTAINER (window), vbox);
 
 	toolbar = gtk_toolbar_new();
@@ -547,6 +543,7 @@ static GtkWidget* new_data_window(GtkTextBuffer **textbuffer, Object **object) {
 
 	style = gtk_widget_get_style(textview);
 	pango_font_description_set_family(style->font_desc, "fixed");
+	pango_font_description_set_size(style->font_desc, 14 * PANGO_SCALE);
 	gtk_widget_modify_font(textview, style->font_desc);
 
 	gtk_container_add (GTK_CONTAINER (scrolled), textview);
@@ -571,13 +568,13 @@ int main(int argc, char *argv[])
 	gtk_init (&argc, &argv);
 
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-	gtk_signal_connect ((GtkObject*)window, "destroy", GTK_SIGNAL_FUNC (gtk_main_quit), "WM destroy");
+	g_signal_connect (window, "destroy", (GCallback)gtk_main_quit, NULL);
 	gtk_window_set_decorated ((GtkWindow*)window, FALSE);
 	gtk_widget_set_size_request(window, 320, -1);
 	gtk_window_set_default_icon_name("gtk-yes");
 
 	hbox = gtk_hbox_new (FALSE, 3);
-	gtk_container_border_width (GTK_CONTAINER (hbox), 3);
+	gtk_container_set_border_width (GTK_CONTAINER (hbox), 3);
 	gtk_container_add (GTK_CONTAINER (window), hbox);
 
 	toolbar = gtk_toolbar_new();
