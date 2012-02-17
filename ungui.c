@@ -61,9 +61,6 @@ static void connectobj(GtkWidget *button, gpointer window) {
 			}
 
 			selected->nexts = g_list_remove(selected->nexts, selected);
-
-			if (selected->cmd != NULL)
-				free(selected->cmd);
 		}
 		selected = NULL;
 		selbutton = NULL;
@@ -222,6 +219,10 @@ static void closeitem(GtkWidget *__unused, gpointer obj) {
 	}
 
 	objects = g_list_remove(objects, data);
+
+	if (data->cmd != NULL)
+		free(data->cmd);
+
 	free(data);
 }
 
