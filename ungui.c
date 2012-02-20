@@ -17,26 +17,12 @@
 #include <gtk/gtk.h>
 #include <stdlib.h>
 #include <string.h>
+#include "fns.h"
+#include "dat.h"
 #define MAXESCSEQLEN 16 
 
 /* type representation of program and data items */
 
-typedef struct _Object Object;
-struct _Object {
-	GtkWidget *window;
-	GList *nexts;
-	Object *prev;
-	GtkWidget *data;
-	GtkWidget *undo;
-	GtkWidget *redo;
-	char *cmd;
-	char *output;
-	int outlen;
-	int stdin;
-	int stdout;
-	GList *undohist;
-	GList *undoptr;
-};
 Object *selected = NULL;
 GtkWidget *selbutton = NULL;
 GList *objects = NULL;
@@ -51,7 +37,7 @@ static void connectobj(GtkWidget *button, gpointer window) {
 	Object *data = window;
 	GList *nexts;
 
-	// cancel
+	// cancel/clear
 	if (data == selected) {
 		gtk_drag_unhighlight(button);
 		if (selected != NULL) {
@@ -60,17 +46,25 @@ static void connectobj(GtkWidget *button, gpointer window) {
 				selected->prev = NULL;
 			}
 
-			selected->nexts = g_list_remove(selected->nexts, selected);
+			while (selected->nexts != NULL) {
+				((Object*)selected->nexts->data)->prev = NULL;
+				selected->nexts = g_list_remove(selected->nexts, selected->nexts->data);
+			}
+
+			arrowsupdate();
 		}
 		selected = NULL;
 		selbutton = NULL;
 	// link
 	} else if (selbutton != NULL) {
 		gtk_drag_unhighlight(selbutton);
-		selected->nexts = g_list_append(selected->nexts, data);
-		if (data->prev != NULL)
-			data->prev->nexts = g_list_remove(data->prev->nexts, data);
-		data->prev = selected;
+		if (g_list_find(selected->nexts, data) == NULL) {
+			selected->nexts = g_list_append(selected->nexts, data);
+			if (data->prev != NULL)
+				data->prev->nexts = g_list_remove(data->prev->nexts, data);
+			data->prev = selected;
+			arrowsupdate();
+		}
 		selected = NULL;
 		selbutton = NULL;
 	// initiate
@@ -81,8 +75,25 @@ static void connectobj(GtkWidget *button, gpointer window) {
 	}
 }
 
+/*
 static gboolean syspathmatch(GtkEntryCompletion *complete, const gchar *key, GtkTreeIter *iter, gpointer opts) {
 	
+}
+*/
+
+gboolean winmovedirty = FALSE;
+
+static gboolean winmovecb(gpointer __unused) {
+	arrowsupdate();
+	winmovedirty = FALSE;
+	return FALSE;
+}
+
+static void winmove(GtkWindow *window, GdkEvent *event, gpointer data) {
+	if (winmovedirty == FALSE) {
+		g_timeout_add(10, (GSourceFunc)winmovecb, NULL);
+		winmovedirty = TRUE;
+	}
 }
 
 static void syspath(GtkWidget *button, gpointer window) {
@@ -92,7 +103,7 @@ static void syspath(GtkWidget *button, gpointer window) {
 	GtkEntryCompletion *complete = gtk_entry_get_completion(text);
 	gchar **path = g_strsplit(g_getenv("PATH"), ":", -1);
 
-	gtk_entry_completion_set_match_func(complete, (GtkEntryCompletionMatchFunc)syspathmatch, NULL, NULL);
+//	gtk_entry_completion_set_match_func(complete, (GtkEntryCompletionMatchFunc)syspathmatch, NULL, NULL);
 
 	gtk_box_pack_start ((GtkBox*)vbox, (GtkWidget*)text, TRUE, TRUE, 1);
 	gtk_container_add((GtkContainer*)gtk_dialog_get_content_area((GtkDialog*)dialog), vbox);
@@ -110,8 +121,10 @@ static void syspath(GtkWidget *button, gpointer window) {
 		Object *data = calloc(1, sizeof(Object));
 		data->cmd = g_strdup(cmd);
 		
+		gtk_widget_add_events(program, GDK_CONFIGURE);
+		g_signal_connect(program, "configure-event", (GCallback)winmove, NULL);
 		g_signal_connect(program, "destroy", (GCallback)closeitem, data);
-		gtk_window_set_title(GTK_WINDOW(program), cmd);
+		gtk_window_set_title((GtkWindow*)program, cmd);
 		gtk_widget_set_size_request(program, 100, -1);
 
 		GtkWidget *hbox = gtk_hbox_new (FALSE, 1);
@@ -224,6 +237,8 @@ static void closeitem(GtkWidget *__unused, gpointer obj) {
 		free(data->cmd);
 
 	free(data);
+
+	arrowsupdate();
 }
 
 static void termbuffer(gchar *contents, GtkTextBuffer **buffer) {
@@ -387,8 +402,9 @@ static void execute_r(Object *data) {
 			data->outlen++;
 			data->output = realloc(data->output, data->outlen+1);
 			data->output[data->outlen-1] = c;
-			data->output[data->outlen] = '\0';
 		}
+		if (data->outlen != 0)
+			data->output[data->outlen] = '\0';
 		close(data->stdout);
 	// data destination is an input window
 	} else if (data->prev != NULL) {
@@ -511,6 +527,8 @@ static GtkWidget* new_data_window(GtkTextBuffer **textbuffer, Object **object) {
 	data->data = textview;
 	data->window = window;
 
+	gtk_widget_add_events(window, GDK_CONFIGURE);
+	g_signal_connect(window, "configure-event", (GCallback)winmove, NULL);
 	g_signal_connect(window, "destroy", (GCallback)closeitem, data);
 	gtk_widget_set_size_request(window, 320, 180);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox), 1);
@@ -524,7 +542,6 @@ static GtkWidget* new_data_window(GtkTextBuffer **textbuffer, Object **object) {
 
 	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-save");
 	g_signal_connect(button, "clicked", (GCallback)savedata, data);
-	gtk_tool_button_set_label((GtkToolButton*)button, "Write");
 	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
 
 	data->undo = button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-undo");
@@ -559,19 +576,28 @@ static GtkWidget* new_data_window(GtkTextBuffer **textbuffer, Object **object) {
 	return window;
 }
 
+static void openmenu(GtkWidget *button, gpointer menu) {
+	gtk_menu_popup((GtkMenu*)menu, NULL, NULL, NULL, NULL, 0, gtk_get_current_event_time());
+}
+
 int main(int argc, char *argv[])
 {
 	GtkWidget *window;
 	GtkWidget *hbox;
 	GtkWidget *toolbar;
-	GtkWidget *button;
+	GtkWidget *toolitem;
+	GtkWidget *menu;
+	GtkWidget *menuitem;
 
 	gtk_init (&argc, &argv);
+
+	arrowsinit();
+	arrowsupdate();
 
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	g_signal_connect (window, "destroy", (GCallback)gtk_main_quit, NULL);
 	gtk_window_set_decorated ((GtkWindow*)window, FALSE);
-	gtk_widget_set_size_request(window, 320, -1);
+	gtk_widget_set_size_request(window, 240, -1);
 	gtk_window_set_default_icon_name("gtk-yes");
 
 	hbox = gtk_hbox_new (FALSE, 3);
@@ -580,25 +606,33 @@ int main(int argc, char *argv[])
 
 	toolbar = gtk_toolbar_new();
 
-	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-execute");
-	gtk_tool_button_set_label((GtkToolButton*)button, "Programs"); 
-	g_signal_connect(button, "clicked", (GCallback)syspath, NULL);
-	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
+	toolitem = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-execute");
+	gtk_tool_button_set_label((GtkToolButton*)toolitem, "Programs"); 
+	g_signal_connect(toolitem, "clicked", (GCallback)syspath, NULL);
+	gtk_toolbar_insert((GtkToolbar*)toolbar, (GtkToolItem*)toolitem, -1);
 
-	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-new");
-	g_signal_connect(button, "clicked", (GCallback)newdata, NULL);
-	gtk_tool_button_set_label((GtkToolButton*)button, "Data");
-	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
+	toolitem = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-dnd");
+	gtk_tool_button_set_label((GtkToolButton*)toolitem, "Data");
+	gtk_toolbar_insert((GtkToolbar*)toolbar, (GtkToolItem*)toolitem, -1);
 
-	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-open");
-	g_signal_connect(button, "clicked", (GCallback)opendata, NULL);
-	gtk_tool_button_set_label((GtkToolButton*)button, "Read");
-	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
+	menu = gtk_menu_new();
 
-	button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-go-forward");
-	gtk_tool_button_set_label((GtkToolButton*)button, "Run"); 
-	g_signal_connect(button, "clicked", (GCallback)execute, NULL);
-	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
+	menuitem = (GtkWidget*)gtk_image_menu_item_new_from_stock("gtk-new", NULL);
+	g_signal_connect(menuitem, "activate", (GCallback)newdata, NULL);
+	gtk_menu_shell_append((GtkMenuShell*)menu, menuitem);
+	gtk_widget_show(menuitem);
+
+	menuitem = (GtkWidget*)gtk_image_menu_item_new_from_stock("gtk-open", NULL);
+	g_signal_connect(menuitem, "activate", (GCallback)opendata, NULL);
+	gtk_menu_shell_append((GtkMenuShell*)menu, menuitem);
+	gtk_widget_show(menuitem);
+
+	g_signal_connect(toolitem, "clicked", (GCallback)openmenu, (gpointer)menu);
+
+	toolitem = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-go-forward");
+	gtk_tool_button_set_label((GtkToolButton*)toolitem, "Run"); 
+	g_signal_connect(toolitem, "clicked", (GCallback)execute, NULL);
+	gtk_toolbar_insert((GtkToolbar*)toolbar, (GtkToolItem*)toolitem, -1);
 
 	gtk_box_pack_start (GTK_BOX (hbox), toolbar, TRUE, TRUE, 2);
 
