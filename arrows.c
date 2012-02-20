@@ -17,6 +17,7 @@
 #include <gtk/gtk.h>
 #include <X11/Xlib.h>
 #include <cairo/cairo-xlib-xrender.h>
+#include <math.h>
 #include "dat.h"
 
 extern GList *objects;
@@ -48,8 +49,11 @@ void arrowsinit() {
 void arrowsupdate() {
 	GList *iter;
 	Object *obj;
-	int x1, y1, x2, y2;
-	int winwidth, winheight;
+	gint x1, y1, x2, y2;
+	double x3, y3, x4, y4;
+	double theta;
+	double dx, dy;
+	int i, len, winwidth, winheight;
 
 	cairo_set_source_rgb(cr, 0.25, 0.5, 0.375);
 	cairo_rectangle(cr, 0, 0, scrwidth, scrheight);
@@ -71,8 +75,35 @@ void arrowsupdate() {
 			x2 += winwidth / 2;
 			y2 += winheight / 2;
 
-			cairo_move_to(cr, x1, y1);
-			cairo_line_to(cr, x2, y2);
+			cairo_move_to(cr, x2, y2);
+			cairo_line_to(cr, x1, y1);
+
+			dx = x2 - x1;
+			dy = y2 - y1;
+			len = sqrt(dx*dx + dy*dy);
+			len /= 50;
+			theta = atan2(dy, dx);
+			dx = cos(theta) * 50;
+			dy = sin(theta) * 50;
+			x3 = x1 + dx;
+			y3 = y1 + dy;
+
+			for (i = 0; i != len; i++) {
+				cairo_move_to(cr, x3, y3);
+
+				x4 = x3 - 20 * cos(theta - M_PI/6);
+				y4 = y3 - 20 * sin(theta - M_PI/6);
+				cairo_line_to(cr, x4, y4);
+				cairo_move_to(cr, x3, y3);
+
+				x4 = x3 - 20 * cos(theta + M_PI/6);
+				y4 = y3 - 20 * sin(theta + M_PI/6);
+				cairo_line_to(cr, x4, y4);
+
+				x3 += dx;
+				y3 += dy;
+			}
+
 			cairo_stroke(cr);
 		}
 		iter = iter->next;

@@ -66,12 +66,6 @@ void connectobj(GtkWidget *button, gpointer window) {
 	}
 }
 
-/*
-gboolean syspathmatch(GtkEntryCompletion *complete, const gchar *key, GtkTreeIter *iter, gpointer opts) {
-	
-}
-*/
-
 gboolean winmovedirty = FALSE;
 
 gboolean winmovecb(gpointer __unused) {
@@ -87,53 +81,44 @@ void winmove(GtkWindow *window, GdkEvent *event, gpointer data) {
 	}
 }
 
-void syspath(GtkWidget *button, gpointer window) {
-	GtkWidget *dialog = gtk_dialog_new_with_buttons("Select Utility", NULL, 0, NULL, NULL);
-	GtkWidget *vbox = gtk_vbox_new(FALSE, 2);
-	GtkEntry *text = (GtkEntry*)gtk_entry_new();
-	GtkEntryCompletion *complete = gtk_entry_get_completion(text);
-	gchar **path = g_strsplit(g_getenv("PATH"), ":", -1);
+gboolean cmdtextchanged(GtkWidget *text, GdkEvent *__unused, gpointer data) {
+	Object *obj = data;
 
-//	gtk_entry_completion_set_match_func(complete, (GtkEntryCompletionMatchFunc)syspathmatch, NULL, NULL);
+	if (obj->cmd != NULL)
+		free(obj->cmd);
 
-	gtk_box_pack_start ((GtkBox*)vbox, (GtkWidget*)text, TRUE, TRUE, 1);
-	gtk_container_add((GtkContainer*)gtk_dialog_get_content_area((GtkDialog*)dialog), vbox);
+	obj->cmd = g_strdup(gtk_entry_get_text((GtkEntry*)text));
 
-	gtk_dialog_add_button((GtkDialog*)dialog, "gtk-cancel", GTK_RESPONSE_CANCEL);
-	gtk_dialog_add_button((GtkDialog*)dialog, "gtk-open", GTK_RESPONSE_ACCEPT);
-	gtk_entry_set_activates_default(text, TRUE);
-	gtk_dialog_set_default_response((GtkDialog*)dialog, GTK_RESPONSE_ACCEPT);
+	return FALSE;
+}
 
-	gtk_widget_show_all(dialog);
+void syspath(GtkWidget *__unused, gpointer window) {
+	GtkWidget *program = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+	Object *data = calloc(1, sizeof(Object));
 
-	if (gtk_dialog_run (GTK_DIALOG (dialog)) == GTK_RESPONSE_ACCEPT) {
-		GtkWidget *program = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-		const gchar *cmd = gtk_entry_get_text((GtkEntry*)text);
-		Object *data = calloc(1, sizeof(Object));
-		data->cmd = g_strdup(cmd);
-		
-		gtk_widget_add_events(program, GDK_CONFIGURE);
-		g_signal_connect(program, "configure-event", (GCallback)winmove, NULL);
-		g_signal_connect(program, "destroy", (GCallback)closeitem, data);
-		gtk_window_set_title((GtkWindow*)program, cmd);
-		gtk_widget_set_size_request(program, 100, -1);
+	gtk_widget_add_events(program, GDK_CONFIGURE);
+	g_signal_connect(program, "configure-event", (GCallback)winmove, NULL);
+	g_signal_connect(program, "destroy", (GCallback)closeitem, data);
+	gtk_widget_set_size_request(program, 320, -1);
 
-		GtkWidget *hbox = gtk_hbox_new (FALSE, 1);
-		GtkWidget *toolbar = gtk_toolbar_new();
+	GtkWidget *hbox = gtk_hbox_new (FALSE, 2);
+	GtkWidget *toolbar = gtk_toolbar_new();
 
-		data->window = program;
-		objects = g_list_append(objects, data);
+	data->window = program;
+	gtk_window_set_title((GtkWindow*)program, "Program");
+	objects = g_list_append(objects, data);
 
-		GtkWidget *button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-connect");
-		g_signal_connect(button, "clicked", (GCallback)connectobj, data);
-		gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
+	GtkWidget *button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-connect");
+	g_signal_connect(button, "clicked", (GCallback)connectobj, data);
+	gtk_toolbar_insert((GtkToolbar*)toolbar, (GtkToolItem*)button, -1);
+	gtk_box_pack_start ((GtkBox*)hbox, toolbar, TRUE, TRUE, 0);
 
-		gtk_box_pack_start ((GtkBox*)hbox, toolbar, TRUE, TRUE, 0);
-		gtk_container_add ((GtkContainer*)program, hbox);
-		gtk_widget_show_all(program);
-	}
+	GtkWidget *text = gtk_entry_new();
+	g_signal_connect(text, "focus-out-event", (GCallback)cmdtextchanged, data);
+	gtk_box_pack_start ((GtkBox*)hbox, text, TRUE, TRUE, 1);
 
-	gtk_widget_destroy (dialog);
+	gtk_container_add ((GtkContainer*)program, hbox);
+	gtk_widget_show_all(program);
 }
 
 void opendata(GtkWidget *button, gpointer __unused) {

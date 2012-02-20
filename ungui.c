@@ -40,7 +40,6 @@ int main(int argc, char *argv[])
 
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	g_signal_connect (window, "destroy", (GCallback)cleanup, NULL);
-	gtk_window_set_decorated ((GtkWindow*)window, FALSE);
 	gtk_widget_set_size_request(window, 240, -1);
 	gtk_window_set_default_icon_name("gtk-yes");
 
