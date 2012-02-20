@@ -580,6 +580,11 @@ static void openmenu(GtkWidget *button, gpointer menu) {
 	gtk_menu_popup((GtkMenu*)menu, NULL, NULL, NULL, NULL, 0, gtk_get_current_event_time());
 }
 
+static void cleanup(gpointer __unused) {
+	arrowsdestroy();
+	gtk_main_quit();
+}
+
 int main(int argc, char *argv[])
 {
 	GtkWidget *window;
@@ -595,7 +600,7 @@ int main(int argc, char *argv[])
 	arrowsupdate();
 
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-	g_signal_connect (window, "destroy", (GCallback)gtk_main_quit, NULL);
+	g_signal_connect (window, "destroy", (GCallback)cleanup, NULL);
 	gtk_window_set_decorated ((GtkWindow*)window, FALSE);
 	gtk_widget_set_size_request(window, 240, -1);
 	gtk_window_set_default_icon_name("gtk-yes");

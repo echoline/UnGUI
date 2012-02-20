@@ -63,7 +63,6 @@ void arrowsupdate() {
 	}
 
 	XClearWindow(dsp, rootwin);
-
 	XMapRaised(dsp, rootwin);
 	XFlush(dsp);
 }
@@ -72,6 +71,10 @@ void arrowsdestroy() {
 	cairo_set_source_rgb(cr, 0.25, 0.5, 0.375);
 	cairo_rectangle(cr, 0, 0, scrwidth, scrheight);
 	cairo_fill(cr);
+
+	XClearWindow(dsp, rootwin);
+	XMapRaised(dsp, rootwin);
+	XFlush(dsp);
 
 	XFreePixmap(dsp, pixmap);
 }
