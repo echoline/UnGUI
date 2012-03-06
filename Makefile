@@ -1,9 +1,10 @@
 ALL=ungui
+SRC=arrows.c data.c programs.c ungui.c objects.c
 
 all: ${ALL}
 
-ungui: ungui.c arrows.c callbacks.c
-	gcc -g -o ungui ungui.c arrows.c callbacks.c `pkg-config --cflags --libs gtk+-3.0` -Wl,--export-dynamic -lm -lX11 -lXrender
+ungui: ${SRC}
+	gcc -g -o ungui ${SRC} `pkg-config --cflags --libs gtk+-2.0` -Wl,--export-dynamic -lm -lX11 -lXrender
 
 clean:
 	rm -f *.o ${ALL}

@@ -22,5 +22,7 @@ void syspath(GtkWidget *button, gpointer window);
 void newdata(GtkWidget *button, gpointer __unused);
 void opendata(GtkWidget *button, gpointer __unused);
 void openmenu(GtkWidget *button, gpointer menu);
+gboolean winmove(GtkWindow *window, GdkEvent *event, gpointer data);
+void connectobj(GtkWidget *button, gpointer window);
 
 void arrowsinit();
