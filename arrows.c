@@ -55,7 +55,7 @@ void arrowsupdate() {
 	double dx, dy;
 	int i, len, winwidth, winheight;
 
-	cairo_set_source_rgb(cr, 0.25, 0.5, 0.375);
+	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_rectangle(cr, 0, 0, scrwidth, scrheight);
 	cairo_fill(cr);
 
@@ -115,7 +115,7 @@ void arrowsupdate() {
 }
 
 void arrowsdestroy() {
-	cairo_set_source_rgb(cr, 0.25, 0.5, 0.375);
+	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_rectangle(cr, 0, 0, scrwidth, scrheight);
 	cairo_fill(cr);
 

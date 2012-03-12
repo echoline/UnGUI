@@ -137,6 +137,10 @@ GtkWidget* new_data_window(GtkTextBuffer **textbuffer, Object **object) {
 	GtkWidget *textview = gtk_text_view_new();
 	GtkWidget *toolbar;
 	GtkWidget *button;
+	GtkWidget *menu;
+	GtkWidget *menuitem;
+	GtkWidget *toolitem;
+	GtkWidget *hbox;
 	GtkTextBuffer *buffer;
 	GtkStyle *style;
 
@@ -147,7 +151,7 @@ GtkWidget* new_data_window(GtkTextBuffer **textbuffer, Object **object) {
 	gtk_widget_add_events(window, GDK_CONFIGURE);
 	g_signal_connect(window, "configure-event", (GCallback)winmove, NULL);
 	g_signal_connect(window, "destroy", (GCallback)closeitem, data);
-	gtk_window_set_default_size((GtkWindow*)window, 320, 180);
+	gtk_window_set_default_size((GtkWindow*)window, 360, 180);
 	gtk_container_set_border_width ((GtkContainer*)vbox, 1);
 	gtk_container_add ((GtkContainer*)window, vbox);
 
@@ -169,6 +173,27 @@ GtkWidget* new_data_window(GtkTextBuffer **textbuffer, Object **object) {
 	g_signal_connect(button, "clicked", (GCallback)redodata, data);
 	gtk_toolbar_insert(GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM(button), -1);
 
+	menu = gtk_menu_new();
+
+	menuitem = (GtkWidget*)gtk_image_menu_item_new_from_stock("gtk-go-forward", NULL);
+	gtk_menu_item_set_label((GtkMenuItem*)menuitem, "Once");
+	g_signal_connect(menuitem, "activate", (GCallback)execute, data);
+	gtk_menu_shell_append((GtkMenuShell*)menu, menuitem);
+	gtk_widget_show(menuitem);
+
+	menuitem = (GtkWidget*)gtk_image_menu_item_new_from_stock("gtk-jump-to", NULL);
+	gtk_menu_item_set_label((GtkMenuItem*)menuitem, "Loop");
+	g_signal_connect(menuitem, "activate", (GCallback)execloop, data);
+	gtk_menu_shell_append((GtkMenuShell*)menu, menuitem);
+	gtk_widget_show(menuitem);
+
+	toolitem = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-go-forward");
+	gtk_tool_button_set_label((GtkToolButton*)toolitem, "Run"); 
+	gtk_toolbar_insert((GtkToolbar*)toolbar, (GtkToolItem*)toolitem, -1);
+	g_signal_connect(toolitem, "clicked", (GCallback)openmenu, (gpointer)menu);
+
+	data->exec = toolitem;
+	gtk_widget_set_sensitive(data->exec, FALSE);
 	gtk_widget_set_sensitive(data->redo, FALSE);
 	gtk_widget_set_sensitive(data->undo, FALSE);
 	objects = g_list_append(objects, data);

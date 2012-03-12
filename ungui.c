@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	g_signal_connect (window, "destroy", (GCallback)cleanup, NULL);
-	gtk_widget_set_size_request(window, 240, -1);
+	gtk_widget_set_size_request(window, 180, -1);
 	gtk_window_set_resizable((GtkWindow*)window, FALSE);
 	gtk_window_set_default_icon_name("gtk-yes");
 
@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
 	toolbar = gtk_toolbar_new();
 
 	toolitem = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-execute");
-	gtk_tool_button_set_label((GtkToolButton*)toolitem, "Programs"); 
+	gtk_tool_button_set_label((GtkToolButton*)toolitem, "Program"); 
 	g_signal_connect(toolitem, "clicked", (GCallback)syspath, NULL);
 	gtk_toolbar_insert((GtkToolbar*)toolbar, (GtkToolItem*)toolitem, -1);
 
@@ -72,11 +72,6 @@ int main(int argc, char *argv[])
 	gtk_widget_show(menuitem);
 
 	g_signal_connect(toolitem, "clicked", (GCallback)openmenu, (gpointer)menu);
-
-	toolitem = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-go-forward");
-	gtk_tool_button_set_label((GtkToolButton*)toolitem, "Run"); 
-	g_signal_connect(toolitem, "clicked", (GCallback)execute, NULL);
-	gtk_toolbar_insert((GtkToolbar*)toolbar, (GtkToolItem*)toolitem, -1);
 
 	gtk_box_pack_start (GTK_BOX (hbox), toolbar, TRUE, TRUE, 2);
 

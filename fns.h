@@ -14,9 +14,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 GtkWidget* new_data_window(GtkTextBuffer **, Object **);
 void closeitem(GtkWidget *__unused, gpointer);
 void execute(GtkWidget *button, gpointer program);
+void execloop(GtkWidget *button, gpointer program);
 void cleanup(gpointer __unused);
 void syspath(GtkWidget *button, gpointer window);
 void newdata(GtkWidget *button, gpointer __unused);
@@ -24,5 +26,5 @@ void opendata(GtkWidget *button, gpointer __unused);
 void openmenu(GtkWidget *button, gpointer menu);
 gboolean winmove(GtkWindow *window, GdkEvent *event, gpointer data);
 void connectobj(GtkWidget *button, gpointer window);
-
 void arrowsinit();
+

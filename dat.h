@@ -24,6 +24,7 @@ struct _Object {
 	GtkWidget *data;
 	GtkWidget *undo;
 	GtkWidget *redo;
+	GtkWidget *exec;
 	char *cmd;
 	char *output;
 	int outlen;
@@ -31,4 +32,6 @@ struct _Object {
 	int stdout;
 	GList *undohist;
 	GList *undoptr;
+	gboolean looping;
+	GtkAdjustment *exectimeout;
 };

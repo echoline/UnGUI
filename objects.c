@@ -64,6 +64,17 @@ void connectobj(GtkWidget *button, gpointer window) {
 		selected = data;
 		selbutton = button;
 	}
+
+	nexts = objects;
+	while (nexts) {
+		data = nexts->data;
+		// only start from "beginning" objects
+		if (data->prev == NULL && data->nexts != NULL)
+			gtk_widget_set_sensitive(data->exec, TRUE);
+		else
+			gtk_widget_set_sensitive(data->exec, FALSE);
+		nexts = nexts->next;
+	}
 }
 
 gboolean winmovedirty = FALSE;
@@ -119,7 +130,7 @@ void termbuffer(gchar *contents, GtkTextBuffer **buffer) {
 	gtk_text_buffer_get_start_iter(*buffer, &start);
 	gtk_text_buffer_get_end_iter(*buffer, &end);
 	gtk_text_buffer_delete(*buffer, &start, &end);
-	gtk_text_buffer_get_start_iter(*buffer, &end); // meh.
+	gtk_text_buffer_get_start_iter(*buffer, &start);
 
 	while (sections[i] != NULL) {
 		tag = gtk_text_buffer_create_tag(*buffer, NULL, NULL);

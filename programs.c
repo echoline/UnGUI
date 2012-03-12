@@ -38,23 +38,45 @@ gboolean cmdtextchanged(GtkWidget *text, GdkEvent *__unused, gpointer data) {
 void syspath(GtkWidget *__unused, gpointer window) {
 	GtkWidget *program = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	Object *data = calloc(1, sizeof(Object));
+	GtkWidget *menu, *menuitem, *toolitem;
 
 	gtk_widget_add_events(program, GDK_CONFIGURE);
 	g_signal_connect(program, "configure-event", (GCallback)winmove, NULL);
 	g_signal_connect(program, "destroy", (GCallback)closeitem, data);
-	gtk_window_set_default_size((GtkWindow*)program, 320, -1);
+	gtk_window_set_default_size((GtkWindow*)program, 400, -1);
 
 	GtkWidget *hbox = gtk_hbox_new (FALSE, 2);
 	GtkWidget *toolbar = gtk_toolbar_new();
-
-	data->window = program;
-	gtk_window_set_title((GtkWindow*)program, "Program");
-	objects = g_list_append(objects, data);
-
 	GtkWidget *button = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-connect");
 	g_signal_connect(button, "clicked", (GCallback)connectobj, data);
 	gtk_toolbar_insert((GtkToolbar*)toolbar, (GtkToolItem*)button, -1);
 	gtk_box_pack_start ((GtkBox*)hbox, toolbar, TRUE, TRUE, 0);
+
+	menu = gtk_menu_new();
+
+	menuitem = (GtkWidget*)gtk_image_menu_item_new_from_stock("gtk-go-forward", NULL);
+	gtk_menu_item_set_label((GtkMenuItem*)menuitem, "Once");
+	g_signal_connect(menuitem, "activate", (GCallback)execute, data);
+	gtk_menu_shell_append((GtkMenuShell*)menu, menuitem);
+	gtk_widget_show(menuitem);
+
+	menuitem = (GtkWidget*)gtk_image_menu_item_new_from_stock("gtk-jump-to", NULL);
+	gtk_menu_item_set_label((GtkMenuItem*)menuitem, "Loop");
+	g_signal_connect(menuitem, "activate", (GCallback)execloop, data);
+	gtk_menu_shell_append((GtkMenuShell*)menu, menuitem);
+	gtk_widget_show(menuitem);
+
+	toolitem = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-go-forward");
+	gtk_tool_button_set_label((GtkToolButton*)toolitem, "Run"); 
+	gtk_toolbar_insert((GtkToolbar*)toolbar, (GtkToolItem*)toolitem, -1);
+	g_signal_connect(toolitem, "clicked", (GCallback)openmenu, (gpointer)menu);
+
+	data->exec = toolitem;
+	data->window = program;
+	gtk_widget_set_sensitive(data->exec, FALSE);
+
+	gtk_window_set_title((GtkWindow*)program, "Program");
+	objects = g_list_append(objects, data);
 
 	GtkWidget *text = gtk_entry_new();
 	g_signal_connect(text, "focus-out-event", (GCallback)cmdtextchanged, data);
@@ -83,13 +105,15 @@ void execute_r(Object *data) {
 
 		if (!g_spawn_async_with_pipes(NULL, argv, NULL, 0, NULL,
 					      NULL, NULL, &data->stdin,
-					      &data->stdout, NULL, &error))
-		{
-			dialog = gtk_message_dialog_new(NULL, 0,
-					GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-					"%s", error->message);
-			gtk_dialog_run((GtkDialog*)dialog);
-			gtk_widget_destroy(dialog);
+					      &data->stdout, NULL, &error)) {
+			if (!data->looping) {
+				dialog = gtk_message_dialog_new(NULL, 0,
+						GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+						"%s", error->message);
+				gtk_dialog_run((GtkDialog*)dialog);
+				gtk_widget_destroy(dialog);
+			}
+
 			return;
 		}
 
@@ -183,15 +207,49 @@ void execute_r(Object *data) {
 }
 
 void execute(GtkWidget *button, gpointer obj) {
-	GList *list = objects;
+	execute_r((Object*)obj);
+}
 
-	// for each start
-	while (list != NULL) {
-		// only start from "beginning" objects
-		if (((Object*)list->data)->prev == NULL)
-			execute_r(list->data);
+gboolean execloopcb(gpointer obj) {
+	execute(NULL, obj);
 
-		list = list->next;
+	return ((Object*)obj)->looping;
+}
+
+void execloopstart(GtkWidget *button, gpointer obj) {
+	g_timeout_add((gint)gtk_adjustment_get_value(
+	    ((Object*)obj)->exectimeout), (GSourceFunc)execloopcb, obj);
+	gtk_widget_destroy((GtkWidget*)((Object*)obj)->exec);
+}
+
+void execloop(GtkWidget *button, gpointer obj) {
+	((Object*)obj)->looping = !((Object*)obj)->looping;
+
+	if (((Object*)obj)->looping) {	
+		GtkWidget *window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+		GtkWidget *hbox = gtk_hbox_new (FALSE, 3);
+
+		((Object*)obj)->exec = window;
+
+		gtk_window_set_default_size((GtkWindow*)window, 300, -1);
+
+		GtkWidget *label = gtk_label_new("Interval (ms)");
+		gtk_box_pack_start ((GtkBox*)hbox, label, FALSE, TRUE, 0);
+
+		GtkWidget *spin = gtk_spin_button_new_with_range(1, 1000000000, 1);
+		((Object*)obj)->exectimeout = gtk_spin_button_get_adjustment((GtkSpinButton*)spin);
+		gtk_adjustment_set_value(((Object*)obj)->exectimeout, 1000);
+		gtk_box_pack_start ((GtkBox*)hbox, spin, TRUE, TRUE, 1);
+
+		GtkWidget *toolbar = gtk_toolbar_new();
+		GtkWidget *toolbutton = (GtkWidget*)gtk_tool_button_new_from_stock("gtk-go-forward");
+		gtk_tool_button_set_label((GtkToolButton*)toolbutton, "Run");
+		g_signal_connect(toolbutton, "clicked", (GCallback)execloopstart, obj);
+		gtk_toolbar_insert((GtkToolbar*)toolbar, (GtkToolItem*)toolbutton, -1);
+		gtk_box_pack_start ((GtkBox*)hbox, toolbar, TRUE, TRUE, 2);
+
+		gtk_container_add ((GtkContainer*)window, hbox);
+		gtk_widget_show_all(window);
 	}
 }
 
