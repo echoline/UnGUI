@@ -153,36 +153,15 @@ void execute_r(Object *data) {
 	} else if (data->prev != NULL) {
 		// from a program
 		if (data->prev->output != NULL) {
-			if (data->undohist == NULL)
-				gtk_widget_set_sensitive(data->undo, FALSE);
-			else
-				gtk_widget_set_sensitive(data->undo, TRUE);
-			gtk_widget_set_sensitive(data->redo, FALSE);
-
 			buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
 			gtk_text_buffer_get_start_iter(buffer, &start);
 			gtk_text_buffer_get_end_iter(buffer, &end);
-			data->undohist = g_list_append(data->undohist, buffer);
 			termbuffer(data->prev->output, &buffer);
 			gtk_text_view_set_buffer((GtkTextView*)data->data, buffer);
 			gtk_text_buffer_get_start_iter(buffer, &start);
 			gtk_text_buffer_get_end_iter(buffer, &end);
-			data->undohist = g_list_append(data->undohist, buffer);
-			data->undoptr = g_list_last(data->undohist);
 		// data from an input window
 		} else if (data->prev->data != NULL) {
-			// store undo state
-			buffer = gtk_text_view_get_buffer((GtkTextView*)data->data);
-			gtk_text_buffer_get_start_iter(buffer, &start);
-			gtk_text_buffer_get_end_iter(buffer, &end);
-			contents = gtk_text_buffer_get_text(buffer, &start, &end, TRUE);
-			if (data->undohist == NULL)
-				gtk_widget_set_sensitive(data->undo, FALSE);
-			else
-				gtk_widget_set_sensitive(data->undo, TRUE);
-			gtk_widget_set_sensitive(data->redo, FALSE);
-			data->undohist = g_list_append(data->undohist, buffer);
-			// fetch new undo state
 			buffer = gtk_text_view_get_buffer((GtkTextView*)data->prev->data);
 			gtk_text_buffer_get_start_iter(buffer, &start);
 			gtk_text_buffer_get_end_iter(buffer, &end);
@@ -190,8 +169,6 @@ void execute_r(Object *data) {
 			len = gtk_text_buffer_get_char_count(buffer);
 			termbuffer(contents, &buffer);
 			gtk_text_view_set_buffer((GtkTextView*)data->data, buffer);
-			data->undohist = g_list_append(data->undohist, buffer);
-			data->undoptr = g_list_last(data->undohist);
 		}
 	}
 

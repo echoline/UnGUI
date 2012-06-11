@@ -22,16 +22,12 @@ struct _Object {
 	GList *nexts;
 	Object *prev;
 	GtkWidget *data;
-	GtkWidget *undo;
-	GtkWidget *redo;
 	GtkWidget *exec;
 	char *cmd;
 	char *output;
 	int outlen;
 	int stdin;
 	int stdout;
-	GList *undohist;
-	GList *undoptr;
 	gboolean looping;
 	GtkAdjustment *exectimeout;
 };
